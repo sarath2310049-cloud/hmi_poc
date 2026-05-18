@@ -212,8 +212,42 @@ h1, h2, h3 { font-family: 'JetBrains Mono', monospace; }
     font-family: 'JetBrains Mono', monospace; font-size: 12px;
 }
 
-/* hide branding */
-#MainMenu {visibility:hidden;} footer {visibility:hidden;} header {visibility:hidden;}
+/* ── Hide Streamlit branding & backend footer ── */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* ── Hide raw code / backend output at bottom ── */
+.stException { display: none; }
+.element-container:has(pre) { display: none; }
+div[data-testid="stCodeBlock"] { display: none; }
+
+/* ── Always show sidebar collapse arrow ── */
+[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #1e3a5f !important;
+    border-radius: 0 8px 8px 0 !important;
+    width: 28px !important;
+    height: 48px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    top: 50% !important;
+    position: fixed !important;
+    left: 0 !important;
+    z-index: 9999 !important;
+    border: 1px solid #3b82f6 !important;
+    cursor: pointer !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background: #2563eb !important;
+}
+
+/* ── Sidebar always accessible ── */
+section[data-testid="stSidebar"][aria-expanded="false"] {
+    margin-left: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -400,8 +434,8 @@ with st.sidebar:
 
     st.divider()
 
-    # Fault injection — only for Engineer
-    if role_cfg.get("can_inject_faults", False):
+    # Fault injection — available to ALL roles for demo
+    if True:
         st.markdown("#### ⚡ Fault Injection")
         scenario_options = {s["label"]: s["id"] for s in CFG.get("fault_scenarios", [])}
         if not scenario_options:
@@ -879,3 +913,14 @@ elif role == "Manager":
 if auto_refresh:
     time.sleep(2)
     st.rerun()
+
+# ── Clean footer — prevents backend code leaking to UI ──
+st.markdown("""
+<style>
+.stException, .stTraceback { display:none !important; }
+div[class*="stCode"] { display:none !important; }
+</style>
+<div style="margin-top:40px;text-align:center;color:#1e293b;font-size:11px;font-family:'JetBrains Mono',monospace">
+IntelliHMI v2.0 · Cobot Packaging Line
+</div>
+""", unsafe_allow_html=True)
