@@ -1,0 +1,20 @@
+{
+  "operator1": {
+    "password": "op123",
+    "role": "Operator",
+    "display_name": "Alex Kumar",
+    "avatar": "👷"
+  },
+  "engineer1": {
+    "password": "eng123",
+    "role": "Engineer",
+    "display_name": "Priya Nair",
+    "avatar": "🔧"
+  },
+  "manager1": {
+    "password": "mgr123",
+    "role": "Manager",
+    "display_name": "Raj Sharma",
+    "avatar": "📊"
+  }
+}

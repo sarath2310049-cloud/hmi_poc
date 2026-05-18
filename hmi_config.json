@@ -1,0 +1,79 @@
+{
+  "system_name": "IntelliHMI — Cobot Packaging Line",
+  "version": "2.0",
+  "signals": [
+    {
+      "id": "conveyor_speed",
+      "label": "Conveyor Speed",
+      "unit": "%",
+      "min": 0,
+      "max": 100,
+      "warning_threshold": 20,
+      "critical_threshold": 2,
+      "icon": "⚙️",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "motor_temp",
+      "label": "Motor Temperature",
+      "unit": "°C",
+      "min": 0,
+      "max": 120,
+      "warning_threshold": 75,
+      "critical_threshold": 90,
+      "icon": "🌡️",
+      "color": "#f97316"
+    },
+    {
+      "id": "motor_current",
+      "label": "Motor Current",
+      "unit": "A",
+      "min": 0,
+      "max": 15,
+      "warning_threshold": 9,
+      "critical_threshold": 12,
+      "icon": "⚡",
+      "color": "#a855f7"
+    },
+    {
+      "id": "packages_per_min",
+      "label": "Throughput",
+      "unit": "ppm",
+      "min": 0,
+      "max": 20,
+      "warning_threshold": 8,
+      "critical_threshold": 5,
+      "icon": "📦",
+      "color": "#22c55e"
+    }
+  ],
+  "fault_scenarios": [
+    { "id": "none",           "label": "✅ Normal Operation",     "emoji": "✅" },
+    { "id": "conveyor_jam",   "label": "🔴 Conveyor Jam",         "emoji": "🔴" },
+    { "id": "motor_overheat", "label": "🟠 Motor Overheat",       "emoji": "🟠" },
+    { "id": "vision_failure", "label": "🟡 Vision Sensor Fault",  "emoji": "🟡" }
+  ],
+  "roles": {
+    "Operator": {
+      "can_inject_faults": false,
+      "can_see_suppressed": false,
+      "can_edit_config": false,
+      "can_acknowledge": true,
+      "views": ["live_signals", "alarms", "root_cause", "recovery", "trends"]
+    },
+    "Engineer": {
+      "can_inject_faults": true,
+      "can_see_suppressed": true,
+      "can_edit_config": true,
+      "can_acknowledge": true,
+      "views": ["live_signals", "alarms", "root_cause", "recovery", "trends", "raw_dump", "alarm_log", "config_editor"]
+    },
+    "Manager": {
+      "can_inject_faults": false,
+      "can_see_suppressed": false,
+      "can_edit_config": false,
+      "can_acknowledge": false,
+      "views": ["kpi", "throughput_trend", "impact_summary"]
+    }
+  }
+}
