@@ -1,15 +1,22 @@
 """
-appp.py  (v2.0 — Full Theme-Compliant Upgrade)
-===============================================
+appp.py  (v3.0 — AI-Assisted + Fully Metadata-Driven)
+======================================================
 IntelliHMI — Next-Gen Control System Interface
 
-NEW in v2.0 (all missing features added):
-  ✅ Login / Role-based access (no more dropdown)
-  ✅ Alarm Acknowledge + Snooze (fatigue tracking)
-  ✅ Metadata-driven UI from hmi_config.json (low-code)
-  ✅ Config Editor for Engineers (no-code threshold editing)
-  ✅ Modern UX: notification-style alarms (Teams-inspired)
-  ✅ Alarm fatigue metrics (response time, missed alarms)
+NEW in v3.0:
+  ✅ 🤖 AI-Assisted Configuration (Claude API generates signal configs from plain English)
+  ✅ ➕ Add New Signal form — new cards + charts appear instantly, zero coding
+  ✅ 🗑️ Remove signals from dashboard via UI
+  ✅ Full label/unit/range editing in Config Editor
+  ✅ Fault injection available to ALL roles (sidebar)
+  ✅ Sidebar always accessible (fixed collapse arrow)
+  ✅ Backend code hidden from UI
+
+FROM v2.0:
+  ✅ Login / Role-based access
+  ✅ Alarm Acknowledge + Snooze + Fatigue tracking
+  ✅ Metadata-driven UI from hmi_config.json
+  ✅ Modern UX notification-style alarms
   ✅ Operator onboarding tooltips
 
 UNTOUCHED (as instructed):
@@ -732,7 +739,7 @@ if role == "Operator":
 elif role == "Engineer":
     st.markdown('<div class="section-header">🔵 Engineer View — Full Diagnostics</div>', unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["📡 Signals & Alarms", "📊 Trends & Log", "⚙️ Config Editor"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📡 Signals & Alarms", "📊 Trends & Log", "⚙️ Config Editor", "🤖 AI Config Assistant"])
 
     with tab1:
         # Raw signals
@@ -818,9 +825,11 @@ Conveyor
             st.info("No alarms logged yet.")
 
     with tab3:
-        # ── LOW-CODE CONFIG EDITOR ──────────────────────────
+        # ══════════════════════════════════════════════
+        # LOW-CODE CONFIG EDITOR + ADD NEW SIGNAL FORM
+        # ══════════════════════════════════════════════
         st.markdown("### ⚙️ Signal Threshold Editor")
-        st.caption("Edit warning/critical thresholds without touching code. Changes save to hmi_config.json.")
+        st.caption("Edit thresholds without touching code. Changes auto-render new cards on dashboard.")
 
         cfg_live = load_config()
         signals  = cfg_live.get("signals", [])
@@ -828,31 +837,237 @@ Conveyor
 
         for i, sig in enumerate(signals):
             with st.expander(f"{sig['icon']} {sig['label']} (unit: {sig['unit']})", expanded=False):
-                c1, c2 = st.columns(2)
-                new_warn = c1.number_input(
-                    f"Warning threshold",
-                    value=float(sig.get("warning_threshold", 0)),
-                    key=f"warn_{sig['id']}"
-                )
-                new_crit = c2.number_input(
-                    f"Critical threshold",
-                    value=float(sig.get("critical_threshold", 0)),
-                    key=f"crit_{sig['id']}"
-                )
-                if new_warn != sig.get("warning_threshold") or new_crit != sig.get("critical_threshold"):
-                    cfg_live["signals"][i]["warning_threshold"]  = new_warn
-                    cfg_live["signals"][i]["critical_threshold"] = new_crit
+                c1, c2, c3 = st.columns(3)
+                new_label = c1.text_input("Label", value=sig.get("label",""), key=f"lbl_{sig['id']}")
+                new_unit  = c1.text_input("Unit",  value=sig.get("unit",""),  key=f"unt_{sig['id']}")
+                new_warn  = c2.number_input("Warning threshold", value=float(sig.get("warning_threshold",0)),  key=f"warn_{sig['id']}")
+                new_crit  = c2.number_input("Critical threshold",value=float(sig.get("critical_threshold",0)), key=f"crit_{sig['id']}")
+                new_min   = c3.number_input("Min range", value=float(sig.get("min",0)),   key=f"min_{sig['id']}")
+                new_max   = c3.number_input("Max range", value=float(sig.get("max",100)), key=f"max_{sig['id']}")
+
+                if (new_warn != sig.get("warning_threshold") or new_crit != sig.get("critical_threshold")
+                        or new_label != sig.get("label") or new_unit != sig.get("unit")):
+                    cfg_live["signals"][i].update({
+                        "label": new_label, "unit": new_unit,
+                        "warning_threshold": new_warn, "critical_threshold": new_crit,
+                        "min": new_min, "max": new_max,
+                    })
                     changed = True
 
+                # Delete signal button
+                if st.button(f"🗑️ Remove {sig['label']}", key=f"del_{sig['id']}"):
+                    cfg_live["signals"].pop(i)
+                    save_config(cfg_live)
+                    st.success(f"Removed {sig['label']}")
+                    st.rerun()
+
         if changed:
-            if st.button("💾 Save Thresholds", type="primary"):
+            if st.button("💾 Save Changes", type="primary", key="save_thresh"):
                 save_config(cfg_live)
-                st.success("✅ Config saved to hmi_config.json")
+                st.success("✅ Saved to hmi_config.json — dashboard updates automatically")
                 st.rerun()
 
         st.divider()
-        st.markdown("**Raw Config (hmi_config.json)**")
-        st.json(cfg_live)
+
+        # ── ADD NEW SIGNAL FORM ──────────────────────────────
+        st.markdown("### ➕ Add New Signal / Device")
+        st.caption("Fill this form to add a completely new signal card + live chart to the dashboard — no coding needed.")
+
+        with st.form("add_signal_form"):
+            fc1, fc2, fc3 = st.columns(3)
+            new_id    = fc1.text_input("Signal ID (no spaces)", placeholder="e.g. pressure_sensor")
+            new_lbl   = fc1.text_input("Display Label",         placeholder="e.g. Pressure Sensor")
+            new_unit  = fc2.text_input("Unit",                  placeholder="e.g. bar, rpm, °C")
+            new_icon  = fc2.text_input("Icon (emoji)",          placeholder="e.g. 🔵")
+            new_color = fc2.text_input("Chart color (hex)",     placeholder="e.g. #3b82f6")
+            new_min   = fc3.number_input("Min value",  value=0.0)
+            new_max   = fc3.number_input("Max value",  value=100.0)
+            new_warn  = fc3.number_input("Warning threshold", value=70.0)
+            new_crit  = fc3.number_input("Critical threshold",value=90.0)
+
+            submitted = st.form_submit_button("➕ Add Signal to Dashboard", type="primary")
+            if submitted:
+                if not new_id or not new_lbl:
+                    st.error("Signal ID and Label are required.")
+                else:
+                    cfg_add = load_config()
+                    existing_ids = [s["id"] for s in cfg_add.get("signals", [])]
+                    if new_id in existing_ids:
+                        st.error(f"Signal ID '{new_id}' already exists.")
+                    else:
+                        cfg_add.setdefault("signals", []).append({
+                            "id":                 new_id,
+                            "label":              new_lbl,
+                            "unit":               new_unit or "",
+                            "icon":               new_icon or "📊",
+                            "color":              new_color or "#3b82f6",
+                            "min":                new_min,
+                            "max":                new_max,
+                            "warning_threshold":  new_warn,
+                            "critical_threshold": new_crit,
+                        })
+                        save_config(cfg_add)
+                        st.success(f"✅ '{new_lbl}' added! It will appear on the dashboard automatically.")
+                        st.rerun()
+
+        st.divider()
+        st.markdown("**📄 Current hmi_config.json**")
+        st.json(load_config())
+
+    with tab4:
+        # ══════════════════════════════════════════════
+        # 🤖 AI-ASSISTED CONFIGURATION
+        # ══════════════════════════════════════════════
+        st.markdown("### 🤖 AI Config Assistant")
+        st.caption("Describe a signal or device in plain English → AI generates the full config entry and adds it to the dashboard instantly.")
+
+        st.markdown("""
+        <div class="tip-box">
+        💡 <b>How it works:</b> Type a plain-English description of what you want to monitor.
+        The AI reads your existing config, understands the context, and generates a ready-to-use
+        signal config with smart threshold suggestions. You can review and approve before saving.
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Example prompts
+        st.markdown("**💬 Example prompts:**")
+        examples = [
+            "Add a hydraulic pressure sensor measuring bar, warn at 80, critical at 100",
+            "Monitor a cooling fan speed in RPM for a packaging motor",
+            "Add vibration sensor for conveyor belt in mm/s",
+            "Track ambient temperature in the factory floor in Celsius",
+        ]
+        ex_cols = st.columns(2)
+        for i, ex in enumerate(examples):
+            if ex_cols[i % 2].button(f"📝 {ex}", key=f"ex_{i}", use_container_width=True):
+                st.session_state["ai_prompt"] = ex
+
+        st.divider()
+
+        user_prompt = st.text_area(
+            "Describe the signal or device you want to add:",
+            value=st.session_state.get("ai_prompt", ""),
+            placeholder="e.g. Add a pressure sensor for the hydraulic system, measuring in bar. Warn at 75 bar, critical at 95 bar.",
+            height=100,
+            key="ai_input"
+        )
+
+        if "ai_generated" not in st.session_state:
+            st.session_state.ai_generated = None
+        if "ai_error" not in st.session_state:
+            st.session_state.ai_error = None
+
+        if st.button("🤖 Generate Config with AI", type="primary", key="ai_gen_btn"):
+            if not user_prompt.strip():
+                st.warning("Please describe the signal first.")
+            else:
+                with st.spinner("🤖 AI is generating your signal config..."):
+                    try:
+                        import requests
+                        existing_cfg = load_config()
+                        existing_signals = existing_cfg.get("signals", [])
+
+                        system_prompt = """You are an industrial HMI configuration assistant.
+Given a plain-English description of an industrial signal or sensor,
+generate a JSON config object with these exact fields:
+{
+  "id": "snake_case_unique_id",
+  "label": "Human Readable Label",
+  "unit": "measurement unit",
+  "icon": "single relevant emoji",
+  "color": "#hexcolor",
+  "min": number,
+  "max": number,
+  "warning_threshold": number,
+  "critical_threshold": number
+}
+
+Rules:
+- id must be lowercase snake_case, unique from existing IDs
+- Choose icon that matches the sensor type
+- Choose a color that fits the signal type (blue for flow/speed, orange/red for heat, green for OK signals, purple for electrical)
+- Set realistic industrial ranges for min/max
+- warning_threshold should be ~75-80% of critical
+- Respond ONLY with the raw JSON object, no markdown, no explanation, no backticks.
+"""
+                        existing_ids_str = ", ".join([s["id"] for s in existing_signals])
+                        user_msg = f"Existing signal IDs (avoid duplicates): {existing_ids_str}\n\nUser request: {user_prompt}"
+
+                        resp = requests.post(
+                            "https://api.anthropic.com/v1/messages",
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "model": "claude-sonnet-4-20250514",
+                                "max_tokens": 500,
+                                "system": system_prompt,
+                                "messages": [{"role": "user", "content": user_msg}]
+                            },
+                            timeout=30
+                        )
+                        resp.raise_for_status()
+                        data = resp.json()
+                        raw_text = data["content"][0]["text"].strip()
+                        # Strip any accidental markdown fences
+                        raw_text = raw_text.replace("```json","").replace("```","").strip()
+                        generated = json.loads(raw_text)
+                        st.session_state.ai_generated = generated
+                        st.session_state.ai_error = None
+                    except Exception as e:
+                        st.session_state.ai_error = str(e)
+                        st.session_state.ai_generated = None
+
+        # Show generated config
+        if st.session_state.ai_error:
+            st.error(f"AI generation failed: {st.session_state.ai_error}")
+
+        if st.session_state.ai_generated:
+            gen = st.session_state.ai_generated
+            st.markdown("#### ✅ AI Generated Config — Review Before Saving")
+
+            # Preview card
+            st.markdown(f"""
+            <div style="background:#111827;border:1px solid #22c55e;border-radius:12px;padding:20px;margin:12px 0">
+                <div style="font-size:28px">{gen.get('icon','📊')}</div>
+                <div style="font-size:18px;font-weight:700;color:#e2e8f0;margin-top:8px">{gen.get('label','')}</div>
+                <div style="color:#64748b;font-size:13px">ID: <code>{gen.get('id','')}</code> · Unit: <b>{gen.get('unit','')}</b></div>
+                <div style="margin-top:12px;display:flex;gap:16px;font-size:13px">
+                    <span>Range: <b style="color:#93c5fd">{gen.get('min',0)} – {gen.get('max',100)} {gen.get('unit','')}</b></span>
+                    <span>⚠️ Warning: <b style="color:#eab308">{gen.get('warning_threshold',70)}</b></span>
+                    <span>🔴 Critical: <b style="color:#ef4444">{gen.get('critical_threshold',90)}</b></span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Editable fields before saving
+            st.markdown("**✏️ Edit before saving (optional):**")
+            ec1, ec2, ec3 = st.columns(3)
+            gen["label"]              = ec1.text_input("Label",              value=gen.get("label",""),              key="ai_edit_label")
+            gen["unit"]               = ec1.text_input("Unit",               value=gen.get("unit",""),               key="ai_edit_unit")
+            gen["warning_threshold"]  = ec2.number_input("Warning",          value=float(gen.get("warning_threshold",70)),  key="ai_edit_warn")
+            gen["critical_threshold"] = ec2.number_input("Critical",         value=float(gen.get("critical_threshold",90)), key="ai_edit_crit")
+            gen["min"]                = ec3.number_input("Min",              value=float(gen.get("min",0)),           key="ai_edit_min")
+            gen["max"]                = ec3.number_input("Max",              value=float(gen.get("max",100)),         key="ai_edit_max")
+
+            st.json(gen)
+
+            col_save, col_disc = st.columns(2)
+            with col_save:
+                if st.button("💾 Add to Dashboard", type="primary", key="ai_save"):
+                    cfg_save = load_config()
+                    existing_ids = [s["id"] for s in cfg_save.get("signals", [])]
+                    if gen["id"] in existing_ids:
+                        st.error(f"ID '{gen['id']}' already exists. Edit the ID above.")
+                    else:
+                        cfg_save.setdefault("signals", []).append(gen)
+                        save_config(cfg_save)
+                        st.success(f"✅ '{gen['label']}' added to dashboard! Visible in Operator view immediately.")
+                        st.session_state.ai_generated = None
+                        st.session_state["ai_prompt"] = ""
+                        st.rerun()
+            with col_disc:
+                if st.button("🗑️ Discard", key="ai_discard"):
+                    st.session_state.ai_generated = None
+                    st.rerun()
 
 # ═══════════════════════════════════════════════════════
 #  MANAGER VIEW
